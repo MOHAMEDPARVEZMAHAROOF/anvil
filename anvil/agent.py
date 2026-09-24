@@ -44,6 +44,8 @@ ONE JSON action per turn, and nothing else. Available actions:
 Rules:
 - Think step by step, but output ONLY the JSON action.
 - Write complete, working files. No placeholders, no TODOs in shipped code.
+- In write actions, "content" must contain REAL line breaks. Never emit literal
+  \n escape sequences inside the file content.
 - Prefer the standard library; you may `pip install -q` small, well-known packages if needed.
 - ALWAYS run the test command before calling done. If tests fail, read the output, fix the code, and rerun.
 - Keep commands short and non-interactive. Never use sudo.
@@ -60,6 +62,25 @@ def _extract_json(text: str) -> dict:
     if not match:
         raise ValueError(f"no JSON object in model output: {text[:200]!r}")
     return json.loads(match.group(0))
+
+
+def _normalize_content(content: str) -> str:
+    """Repair double-escaped file content from the builder.
+
+    Occasionally a model emits literal backslash-n sequences instead of real
+    line breaks inside the write action's content string. A file that is one
+    giant escaped line is never what the model intended, so decode the common
+    escapes in that case. Content with real newlines is left untouched.
+    """
+    if not content:
+        return content
+    real_newlines = content.count("\n")
+    escaped_newlines = content.count("\\n")
+    if escaped_newlines >= 3 and real_newlines < 3:
+        content = (content.replace("\\n", "\n")
+                          .replace("\\t", "\t")
+                          .replace('\\"', '"'))
+    return content
 
 
 class CodingAgent:
@@ -155,9 +176,10 @@ class CodingAgent:
 
                 if kind == "write":
                     path = action["path"]
-                    sandbox.write_file(path, action.get("content", ""))
+                    content = _normalize_content(action.get("content", ""))
+                    sandbox.write_file(path, content)
                     emit("write", f"Wrote {path}")
-                    history.append({"role": "user", "content": f"Wrote {path} ({len(action.get('content',''))} chars)."})
+                    history.append({"role": "user", "content": f"Wrote {path} ({len(content)} chars)."})
                 elif kind == "read":
                     path = action["path"]
                     try:
