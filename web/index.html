@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anvil — autonomous coding engineer on Nebius</title>
+<style>
+  :root {
+    --bg: #f8fafc; --panel: #ffffff; --ink: #0f172a; --muted: #64748b;
+    --line: #e2e8f0; --accent: #4f46e5; --accent-soft: #eef2ff;
+    --ok: #15803d; --ok-soft: #f0fdf4; --bad: #b91c1c; --bad-soft: #fef2f2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 18px 28px; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+  header h1 .anvil { color: var(--accent); font-weight: 800; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 980px; margin: 24px auto 64px; padding: 0 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+          text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  textarea { width: 100%; min-height: 96px; border: 1px solid var(--line); border-radius: 8px;
+             padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; }
+  textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+           padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); }
+  #timeline { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+  #timeline li { padding: 10px 12px; border-left: 3px solid var(--line); margin: 6px 0 6px 4px;
+                 background: #fbfdff; border-radius: 0 8px 8px 0; font-size: 13px; }
+  #timeline li .t { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: .05em; color: var(--muted); display: block; margin-bottom: 2px; }
+  #timeline li.plan  { border-color: var(--accent); }
+  #timeline li.exec  { border-color: #0ea5e9; }
+  #timeline li.write { border-color: #8b5cf6; }
+  #timeline li.fix   { border-color: #f59e0b; }
+  #timeline li.error { border-color: var(--bad); background: var(--bad-soft); }
+  #timeline li.done  { border-color: var(--ok); background: var(--ok-soft); }
+  #timeline code.meta { display: block; margin-top: 6px; white-space: pre-wrap; font-size: 12px;
+                        color: var(--muted); max-height: 160px; overflow-y: auto; }
+  #result { display: none; }
+  #result.show { display: block; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px;
+            border-radius: 999px; margin-bottom: 10px; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #bbf7d0; }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); border: 1px solid #fecaca; }
+  pre.diff { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 8px;
+             overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  pre.report { background: var(--bg); border: 1px solid var(--line); padding: 12px;
+               border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
+  .samples button { background: var(--accent-soft); color: var(--accent); font-weight: 500;
+                    padding: 6px 12px; font-size: 12px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="anvil">Anvil</span> — autonomous coding engineer</h1>
+  <p>Plans with Nemotron 3 Ultra · builds with Nemotron 3 Super/Nano · runs &amp; tests in Nebius Token Factory Sandboxes</p>
+</header>
+<main>
+  <div class="card">
+    <label for="task">Coding task</label>
+    <textarea id="task" placeholder="e.g. Write a Python rate limiter (token bucket) with pytest tests covering burst, refill, and thread safety."></textarea>
+    <div class="row">
+      <button id="run">Forge it</button>
+      <span class="hint" id="status">Describe the task, then hit Forge it. The agent writes, runs, and tests code in a Nebius sandbox.</span>
+    </div>
+    <div class="row samples">
+      <button data-task="Write a Python module stats.py with mean, median, and mode functions, plus pytest tests covering empty input and single values.">stats module</button>
+      <button data-task="Build a tiny CSV-to-JSON CLI (csv2json.py) using argparse, with pytest tests for valid input, missing file, and malformed CSV.">csv2json cli</button>
+      <button data-task="Implement an LRU cache class in Python with get/put and capacity eviction, plus pytest tests for eviction order and updates.">lru cache</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Live agent timeline</label>
+    <ul id="timeline"><li><span class="t">idle</span>No run yet.</li></ul>
+  </div>
+
+  <div class="card" id="result">
+    <label>Result</label>
+    <div id="verdict"></div>
+    <p id="summary"></p>
+    <label>Test report</label>
+    <pre class="report" id="report"></pre>
+    <label>Diff</label>
+    <pre class="diff" id="diff"></pre>
+  </div>
+</main>
+<footer>Anvil · built for the Nebius x NVIDIA Global AI Hackathon · NVIDIA Nemotron on Nebius Token Factory</footer>
+
+<script>
+const taskEl = document.getElementById('task');
+const runBtn = document.getElementById('run');
+const statusEl = document.getElementById('status');
+const timelineEl = document.getElementById('timeline');
+const resultEl = document.getElementById('result');
+
+document.querySelectorAll('.samples button').forEach(b => {
+  b.addEventListener('click', () => { taskEl.value = b.dataset.task; });
+});
+
+function addEvent(ev) {
+  if (timelineEl.querySelector('li .t')?.textContent === 'idle') timelineEl.innerHTML = '';
+  const li = document.createElement('li');
+  li.className = ev.type;
+  const label = {plan:'plan', think:'think', write:'write', exec:'exec', read:'read',
+                 search:'search', fix:'fix', done:'done', error:'error'}[ev.type] || ev.type;
+  let meta = '';
+  if (ev.data) {
+    if (ev.data.plan) meta = ev.data.plan.map(s => '• ' + s).join('\n');
+    else if (ev.data.test_command) meta = 'test: ' + ev.data.test_command;
+    else if (ev.data.exit_code !== undefined) meta = 'exit code: ' + ev.data.exit_code;
+  }
+  li.innerHTML = `<span class="t">${label}</span>${escapeHtml(ev.message)}` +
+                (meta ? `<code class="meta">${escapeHtml(meta)}</code>` : '');
+  timelineEl.appendChild(li);
+  timelineEl.scrollTop = timelineEl.scrollHeight;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+runBtn.addEventListener('click', async () => {
+  const task = taskEl.value.trim();
+  if (!task) return;
+  runBtn.disabled = true;
+  timelineEl.innerHTML = '';
+  resultEl.classList.remove('show');
+  statusEl.textContent = 'Starting run…';
+  try {
+    const res = await fetch('/api/runs', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task})
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const {run_id} = await res.json();
+    statusEl.textContent = 'Agent running in Nebius sandbox…';
+    const es = new EventSource(`/api/runs/${run_id}/events`);
+    es.addEventListener('end', async () => {
+      es.close();
+      const r = await (await fetch(`/api/runs/${run_id}`)).json();
+      showResult(r.result);
+      runBtn.disabled = false;
+      statusEl.textContent = 'Run finished.';
+    });
+    es.onmessage = e => addEvent(JSON.parse(e.data));
+    es.onerror = () => { statusEl.textContent = 'Stream interrupted.'; es.close(); runBtn.disabled = false; };
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    runBtn.disabled = false;
+  }
+});
+
+function showResult(r) {
+  if (!r) return;
+  resultEl.classList.add('show');
+  document.getElementById('verdict').innerHTML =
+    `<span class="badge ${r.success ? 'ok' : 'bad'}">${r.success ? '✓ tests green' : '✗ finished with issues'}</span>`;
+  document.getElementById('summary').textContent = r.summary;
+  document.getElementById('report').textContent = r.test_report;
+  document.getElementById('diff').textContent = r.diff;
+  resultEl.scrollIntoView({behavior: 'smooth'});
+}
+</script>
+</body>
+</html>
