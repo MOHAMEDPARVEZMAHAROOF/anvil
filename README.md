@@ -35,7 +35,7 @@ routing keeps costs down: Ultra only plans, Super builds, Nano handles fast call
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd anvil
+git clone https://github.com/MOHAMEDPARVEZMAHAROOF/anvil.git && cd anvil
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # then add your NEBIUS_API_KEY (Builder Program: https://dev.nebius.com)
